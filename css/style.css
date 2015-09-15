@@ -1,0 +1,6 @@
+#newsearch {
+  display:none;
+}
+#newsearch .button {
+  cursor: pointer;
+}
