@@ -1,59 +1,70 @@
-function ApiData(zip) {
-  this.zip = zip;
-  this.api_key = "ez3mx4r7skrxpe9au2y8bpgn";
-  var d = new Date();
-  this.startDate = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-  this.jsonp = "dataHandler";
+function Theater(name, address, movies) {
+  this.name = name;
+  this.address = address;
+  this.movies = movies;
 }
 
-function ApiAjax(zip) {
-  this.url = "http://data.tmsapi.com/v1.1/movies/showings";
-  this.dataType = "jsonp";
-  this.data = new ApiData(zip);
+function Movie(title, rating, trailer, times) {
+  this.title = title;
+  this.rating = rating;
+  this.trailer = trailer;
+  this.times = times;
 }
-
-function dataHandler(data) {
-  $("#movieresults").append('<p>Found ' + data.length + ' movies showing within 5 miles of you:</p>');
-  var movies = data.hits;
-  $.each(data, function(index, movie) {
-    var movieData = "<div class='page-header'><h3>" + movie.title
-    if (movie.ratings) { movieData += ' <small>(' + movie.ratings[0].code + ')</small>'};
-    movieData += '</h3></div><p>' + movie.shortDescription + '</p><p>' + movie.genres + '</p></div>';
-
-    var theatreName = "";
-
-    for(var key in movie.showtimes) {
-      movie.showtimes[key]
-    }
-
-    movie.showtimes.forEach(function(showtime) {
-      var time = new Date(showtime.dateTime);
-      var hours = time.getHours() + 7;
-      if (hours > 12) {
-        hours -= 12;
-        var ampm = "pm";
-      } else {
-        var ampm = "am";
-      }
-      if (theatreName === showtime.theatre.name) {
-        movieData += '<span> ' + hours + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes() + ampm + '</span>'
-      } else {
-        movieData += '<h5>' + showtime.theatre.name + '</h5>'
-        movieData += '<span>' + hours + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes() + ampm + '</span>'
-      }
-      theatreName = showtime.theatre.name
-    });
-
-    $("#movieresults").append(movieData);
-  });
-}
-
 
 $(document).ready(function() {
   $("form#movie-request").submit(function(event) {
     event.preventDefault();
     var zip = $('input#zip').val();
-    $.ajax(new ApiAjax(zip));
+    var results;
+    $.ajax({
+      url: "https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20where%20url%3D'http%3A%2F%2Fgoogle.com%2Fmovies%3Fnear%3D" + zip + "'%20and%20xpath%3D'%2F%2Fdiv%5Bcontains(%40class%2C%22movie_results%22)%5D'&format=json&diagnostics=true&callback=",
+      success: function(data) {
+        var theaters = [];
+        var usableData = data.query.results.div.div;
+        usableData.forEach(function(theater) {
+          var theaterName = theater.div[0].h2.a.content;
+          var theaterAddress = theater.div[0].div.content;
+          var movies = [];
+          var movieList = [];
+
+          if (theater.div[1].div[0] !== undefined) {
+            movieList = theater.div[1].div[0].div.concat(theater.div[1].div[1].div);
+          } else {
+            var movie = theater.div[1].div.div;
+            movieList.push(movie);
+          }
+
+          movieList.forEach(function(movie){
+            var movieName = movie.div[0].a.content;
+            var movieRating = movie.span.content;
+            movieRating = movieRating.substring(0, movieRating.length - 5);
+
+            if (movie.span.a[0] === undefined) {
+              var movieTrailer = "";
+            } else {
+              var movieTrailer = movie.span.a[0].href;
+            }
+
+            var movieTimes = [];
+            if (movie.div[1].span[0] === undefined) {
+              movieTimes.push(movie.div[1].span.content)
+            } else {
+              movie.div[1].span.forEach(function(time) {
+                movieTimes.push(time.content);
+              })
+            }
+
+            var newMovie = new Movie(movieName, movieRating, movieTrailer, movieTimes.join(', '));
+            movies.push(newMovie);
+          })
+
+          var newTheater = new Theater(theaterName, theaterAddress, movies);
+          theaters.push(newTheater);
+        })
+
+        console.log(theaters);
+      }
+    })
 
     $("#movieform").hide();
     $("#newsearch").show();
